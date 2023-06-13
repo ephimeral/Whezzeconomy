@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 from main import client
 from datetime import datetime, timedelta
+from discord import app_commands
 from typing import Literal
 import asqlite
 
@@ -47,7 +48,7 @@ class Tienda(commands.Cog): #Clase de cog para los comandos
     async def tienda(self, ctx):
         async with asqlite.connect('wisis.db') as con:
             async with con.cursor() as cur:
-                await cur.execute("SELECT nombre, valor, descripcion FROM objetos")
+                await cur.execute("SELECT nombre, valor, descripcion, orbes FROM objetos WHERE comprable = 0")
                 objetos = await cur.fetchall()
 
                 embed = discord.Embed(title="🛍️ Tienda",
@@ -58,69 +59,108 @@ class Tienda(commands.Cog): #Clase de cog para los comandos
                     nombre = objeto[0]
                     valor = objeto[1]
                     descripcion = objeto[2]
-                    embed.add_field(name=f"{nombre}",value=f"<:whezze:1029620490408574987> **{valor}**\n{descripcion}",inline=False)
+                    orbes = objeto[3]
+                    if orbes > 0:
+                        embed.add_field(name=f"{nombre}",value=f"🔮 **{orbes}**\n{descripcion}",inline=False)
+                    else:
+                        embed.add_field(name=f"{nombre}",value=f"<:whezze:1029620490408574987> **{valor}**\n{descripcion}",inline=False)
 
                 await ctx.send(embed=embed)
 
 
+    async def objeto_autocomplete(self, interaction: discord.Interaction, current: str):
+        objetos = ['BanTicket', 'TimeoutTicket', 'Antilloros', 'Rol', 'MazoMagico']
+        return [
+            app_commands.Choice(name=objeto, value=objeto)
+            for objeto in objetos if current.lower() in objeto.lower()
+        ]
 
-
-    @commands.hybrid_command(name="comprar", description="Compra un objeto")
+    @app_commands.command(name="comprar", description="Compra un objeto")
+    @app_commands.autocomplete(objeto=objeto_autocomplete)
     @commands.cooldown(1, 10, commands.BucketType.member)
-    async def comprar(self, ctx, objeto: str, cantidad: int):
+    async def comprar(self, interaction: discord.Interaction, objeto: str, cantidad: int):
 
         async with asqlite.connect('wisis.db') as con:
             async with con.cursor() as cur:
                 # Verificar si el objeto existe en la base de datos
-                await cur.execute("SELECT objeto_id, valor FROM objetos WHERE nombre = ?", (objeto,))
+                await cur.execute("SELECT objeto_id, valor, orbes FROM objetos WHERE nombre = ?", (objeto,))
                 resultado = await cur.fetchone()
+                comprable_orbes = False
 
                 if resultado == None:
-                    await ctx.send(embed=await errorEmbed("No existe este objeto"))
+                    await interaction.response.send_message(embed=await errorEmbed("No existe este objeto"))
                     return
 
+                if resultado[2] > 0:
+                    comprable_orbes = True
+
                 if cantidad < 0:
-                    await ctx.send(embed=await errorEmbed("Se ha especificado una cantidad negativa"))
+                    await interaction.response.send_message(embed=await errorEmbed("Se ha especificado una cantidad negativa"))
                     return
 
                 # Asignar los datos de la query anterior a dos variables
-                valor = resultado[1] * cantidad
+                if resultado[2] > 0:
+                    valor = resultado[2] * cantidad
+                else:
+                    valor = resultado[1] * cantidad
                 objeto_id = resultado[0]
 
-                # Verificar wisis del usuario
-                await cur.execute("SELECT wisis FROM usuarios WHERE usuario_id = ?", (ctx.author.id,))
-                resultado = await cur.fetchone() 
+                # Verificar wisis y orbes del usuario
+                await cur.execute("SELECT wisis, orbes FROM usuarios WHERE usuario_id = ?", (interaction.user.id,))
+                resultado = await cur.fetchone()
 
-                if resultado[0] < valor:
-                    embed = discord.Embed(title="No tienes wisis suficientes!",
-                                        description=f"Tus <:whezze:1029620490408574987>: **{resultado[0]}**\nCoste de **{objeto} x{cantidad}**: <:whezze:1029620490408574987> **{valor}**",
-                                        colour=discord.Colour.red())
-                    await ctx.send(embed=embed)
-                    return
+                if comprable_orbes:
+                    if resultado[1] < valor:
+                        embed = discord.Embed(title="No tienes orbes suficientes!",
+                                            description=f"Tus 🔮 **{resultado[1]}**\nCoste de **{objeto} x{cantidad}**: 🔮 **{valor}**",
+                                            colour=discord.Colour.red())
+                        await interaction.response.send_message(embed=embed)
+                        return
+
+                else:
+
+                    if resultado[0] < valor:
+                        embed = discord.Embed(title="No tienes wisis suficientes!",
+                                            description=f"Tus <:whezze:1029620490408574987>: **{resultado[0]}**\nCoste de **{objeto} x{cantidad}**: <:whezze:1029620490408574987> **{valor}**",
+                                            colour=discord.Colour.red())
+                        await interaction.response.send_message(embed=embed)
+                        return
+
 
                 # Verificar si el objeto ya existe en el inventario
-                await cur.execute("SELECT usuario_id FROM inventario WHERE objeto_id = ? AND usuario_id = ?", (objeto_id, int(ctx.author.id)))
+                await cur.execute("SELECT usuario_id FROM inventario WHERE objeto_id = ? AND usuario_id = ?", (objeto_id, int(interaction.user.id)))
                 resultado = await cur.fetchone()
 
                 # Si no existe, crea una row en la db, si existe, actualiza el valor de la cantidad
                 if resultado == None:
                     await cur.execute("INSERT INTO inventario (usuario_id, objeto_id, cantidad) VALUES (?, ?, ?)",
-                                (int(ctx.author.id), objeto_id, cantidad))
+                                (int(interaction.user.id), objeto_id, cantidad))
                 else:
-                    await cur.execute("UPDATE inventario SET cantidad = cantidad + ? WHERE usuario_id = ? AND objeto_id = ?", (cantidad, int(ctx.author.id), objeto_id))
+                    await cur.execute("UPDATE inventario SET cantidad = cantidad + ? WHERE usuario_id = ? AND objeto_id = ?", (cantidad, int(interaction.user.id), objeto_id))
 
-                await cur.execute("UPDATE usuarios SET wisis = wisis - ? WHERE usuario_id = ?", (valor, int(ctx.author.id)))
-                await cur.execute("SELECT wisis FROM usuarios WHERE usuario_id = ?", (int(ctx.author.id),))
-                wisis = await cur.fetchone()
+                if comprable_orbes:
+                    await cur.execute("UPDATE usuarios SET orbes= orbes- ? WHERE usuario_id = ?", (valor, int(interaction.user.id)))
+                    await cur.execute("SELECT orbes FROM usuarios WHERE usuario_id = ?", (int(interaction.user.id),))
+                    orbes = await cur.fetchone()
 
-                embed = discord.Embed(title="✅  Compra realizada",
-                                    description=f"Haz comprado ``x{cantidad} {objeto}`` por el valor de <:whezze:1029620490408574987> **{valor}**\n<:whezze:1029620490408574987> actuales: {wisis[0]}",
-                                    colour= discord.Colour.green())
-                await ctx.send(embed=embed)
+                    embed = discord.Embed(title="✅  Compra realizada",
+                                        description=f"Haz comprado ``x{cantidad} {objeto}`` por el valor de 🔮 **{valor}**\n🔮 actuales: {orbes[0]}",
+                                        colour= discord.Colour.green())
+                    await interaction.response.send_message(embed=embed)
 
-                await con.commit()
+                    await con.commit()
+                else:
+                    await cur.execute("UPDATE usuarios SET wisis = wisis - ? WHERE usuario_id = ?", (valor, int(interaction.user.id)))
+                    await cur.execute("SELECT wisis FROM usuarios WHERE usuario_id = ?", (int(interaction.user.id),))
+                    wisis = await cur.fetchone()
 
-        
+                    embed = discord.Embed(title="✅  Compra realizada",
+                                        description=f"Haz comprado ``x{cantidad} {objeto}`` por el valor de <:whezze:1029620490408574987> **{valor}**\n<:whezze:1029620490408574987> actuales: {wisis[0]}",
+                                        colour= discord.Colour.green())
+                    await interaction.response.send_message(embed=embed)
+
+                    await con.commit()
+
 
     @commands.hybrid_command(name="objeto", description="Muestra información sobre un objeto")
     @commands.cooldown(1, 10, commands.BucketType.member)

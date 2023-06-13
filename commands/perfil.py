@@ -31,24 +31,23 @@ class Perfil(commands.Cog): #Clase de cog para los comandos
         self.client = client
         
     @commands.hybrid_command(name="wisis", description="Muestra los wisis del usuario")
-    @commands.cooldown(1, 10, commands.BucketType.member)
+    @commands.cooldown(1, 5, commands.BucketType.member)
     async def wisis(self, ctx, usuario: discord.Member = None):
     	async with asqlite.connect('wisis.db') as con:
     		async with con.cursor() as cur:
 		    	if usuario == None:
 		    		usuario = ctx.author
 
-		    	await cur.execute("SELECT wisis FROM usuarios WHERE usuario_id = ?", (int(usuario.id),))
+		    	await cur.execute("SELECT wisis, wisis_totales, orbes, hechizo_activo FROM usuarios WHERE usuario_id = ?", (int(usuario.id),))
 		    	whezzes = await cur.fetchone()
 		    	embed = discord.Embed(title=f"{usuario.display_name} Whezzes",
 			    					colour=discord.Colour.dark_gold())
-		    	embed.add_field(name=f"<:whezze:1029620490408574987> **ACTUALES**", value=f"{whezzes[0]}")
+		    	embed.add_field(name=f"<:whezze:1029620490408574987>", value=f"{whezzes[0]}")
 
-
-		    	await cur.execute("SELECT wisis_totales FROM usuarios WHERE usuario_id = ?", (int(usuario.id),))
-		    	whezzes = await cur.fetchone()
-		    	embed.add_field(name="\n<:whezze:1029620490408574987> **TOTALES**", value=f"{whezzes[0]}")
-		    	embed.add_field(name="``Rango:``", value=f"**{await seleccionar_rango(whezzes[0])}**", inline=False)
+		    	embed.add_field(name="\n<:whezze:1029620490408574987> **TOTALES**", value=f"{whezzes[1]}")
+		    	embed.add_field(name="\n🔮", value=f"{whezzes[2]}")
+		    	embed.add_field(name="\nHechizo", value=f"``{whezzes[3]}``")
+		    	embed.add_field(name="``Rango:``", value=f"**{await seleccionar_rango(whezzes[1])}**", inline=False)
 
 
 		    	embed.set_thumbnail(url=usuario.display_avatar)
@@ -75,6 +74,7 @@ class Perfil(commands.Cog): #Clase de cog para los comandos
 		    		embed.add_field(name=f"{nombre[0]}", value=f"Tienes: **{cantidad}**")
 
 		    	await ctx.send(embed=embed)
+
     	
 
 

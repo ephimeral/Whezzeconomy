@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import asyncio
 import asqlite
 
-extensiones = ['commands.perfil', 'commands.admin', 'commands.leaderboard', 'commands.tienda']
+extensiones = ['commands.perfil', 'commands.admin', 'commands.leaderboard', 'commands.tienda', 'commands.magia']
 
 # Subclaseando 
 class MyBot(commands.Bot):
@@ -17,6 +17,7 @@ class MyBot(commands.Bot):
             await client.load_extension(extension)
         check_tempbans.start()
         clear_sistema.start()
+        clear_sistema_magia.start()
 
     async def on_ready(self):
         print(f"Logging in as: {self.user}")
@@ -26,7 +27,7 @@ class MyBot(commands.Bot):
 
 #Creando el cliente/bot
 client = MyBot(command_prefix=commands.when_mentioned_or("$$"),intents=discord.Intents.all(),
-                      case_insensitive=True, activity=discord.Game(name="Jugado con la cuca de la mamá de gaza"))
+                      case_insensitive=True, activity=discord.Game(name="con el clítoris de la melónmadre"))
 client.remove_command('help')
 
 #Esto es para los comandos "/"
@@ -35,7 +36,11 @@ tree = client.tree
 
 
 
-''' FUNCIONES DEL BOT '''
+"""''' FUNCIONES DEL BOT '''
+@client.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.CommandOnCooldown):
+        await ctx.send(f"¡Espera {error.retry_after:.2f} segundos antes de usar este comando nuevamente!")"""
 
 
 #Sincronizar los comandos "/", se tiene que hacer cada que haya un cambio en estos tipos de comandos
@@ -77,11 +82,13 @@ async def unload(ctx, extension : str):
 @commands.is_owner()
 async def actualizacion(ctx):
 
-    embed = discord.Embed(title="WHEZZECONOMY 3.0",
-                        description="➠ Ahora con comandos **/**\n➠ Objetos de uso automático con **/usar**\n➠ Rangos, wisis totales y top wisis **/help leaderboard**\n➠ Nueva base de datos, más veloz y eficaz",
-                        colour=discord.Colour.gold())
-    embed.set_image(url="https://cdn.discordapp.com/attachments/1029613068788957206/1109984644948054067/rimlim.png")
+    embed = discord.Embed(title="WHEZZECONOMY 3.1",
+                        description="➠ Autocompletado al comprar con ``/`` para los disléxicos del server\n\n➠Varios bugs corregidos\n\n➠Evento limitado **SHADOW WIZARD MONEY GANG**, gana objetos derrotando magos,\n``/tutorial`` para empezar",
+                        colour=discord.Colour.dark_purple())
+    embed.set_image(url="https://img.ifunny.co/images/f5a7297a57a663074da4b5c09561eec1265724ad0669bbc9a4d2b42454c0113b_1.jpg")
     await ctx.send(embed=embed)
+
+
 
 ''' FUNCIONES DE LA BASE DE DATOS '''
 
@@ -89,13 +96,13 @@ async def actualizacion(ctx):
 async def añadir_usuario_database(memberid):
     async with asqlite.connect('wisis.db') as con:
         async with con.cursor() as cur:
-            await cur.execute("INSERT OR IGNORE INTO usuarios VALUES (?, ?, ?, ?)", (memberid, 0, 0, 0))
+            await cur.execute("INSERT OR IGNORE INTO usuarios VALUES (?, ?, ?, ?, ?, ?, ?)", (memberid, 0, 0, 0, "Ninguno", 0, 0))
             await con.commit()
 
 async def añadir_varios_usuarios_database(miembros_id):
     async with asqlite.connect('wisis.db') as con:
         async with con.cursor() as cur:
-            await cur.executemany("INSERT OR IGNORE INTO usuarios VALUES (?, ?, ?, ?)", [(miembro_id, 0, 0, 0) for miembro_id in miembros_id])
+            await cur.executemany("INSERT OR IGNORE INTO usuarios VALUES (?, ?, ?, ?)", [(miembro_id, 0, 0, 0, "Ninguno", 0, 0) for miembro_id in miembros_id])
             await con.commit()
 
 @client.command()
@@ -205,10 +212,26 @@ async def clear_sistema():
         async with con.cursor() as cur:
             await cur.execute("DELETE FROM sistemawis")
 
+@tasks.loop(seconds=20)
+async def clear_sistema_magia():
+    async with asqlite.connect('wisis.db') as con:
+        async with con.cursor() as cur:
+
+            current_time = datetime.utcnow().timestamp()
+            await cur.execute('SELECT user_id FROM sistema_magia WHERE des_cooldown <= ?', (current_time,))
+            expired_cool = await cur.fetchall()
+            if len(expired_cool) == 0:
+                return
+
+            for cool in expired_cool:
+                await cur.execute('DELETE FROM sistema_magia WHERE des_cooldown <= ?', (current_time,))
+
+
+
 
 
 
                     
 
 if __name__ == "__main__":
-    client.run(TOKEN)
+    client.run("MTExNjUwODY3NTk3NzI1Mjk0NQ.GVoZp5.IrB5dK1hJMaM3NuwQXjIhyudgItprttYfHm4TM")

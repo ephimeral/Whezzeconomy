@@ -26,14 +26,14 @@ class Admin(commands.Cog): #Clase de cog para los comandos
     @commands.hybrid_command(name="additem", description="Añade un objeto")
     @commands.cooldown(1, 10, commands.BucketType.member)
     @commands.is_owner()
-    async def additem(self, ctx, nombre: str, valor: int, descripcion: str):
+    async def additem(self, ctx, nombre: str, valor: int, descripcion: str, comprable: int):
         async with asqlite.connect('wisis.db') as con:
             async with con.cursor() as cur:
                 await cur.execute("SELECT COUNT(*) FROM objetos WHERE nombre = ?", (nombre,))
                 result = await cur.fetchone()
 
                 if result[0] == 0:
-                    await cur.execute("INSERT INTO objetos (nombre, valor, descripcion) VALUES (?, ?, ?)", (nombre, valor, descripcion))
+                    await cur.execute("INSERT INTO objetos (nombre, valor, descripcion, comprable) VALUES (?, ?, ?, ?)", (nombre, valor, descripcion, comprable))
                     await con.commit()
 
                     embed = discord.Embed(title="Objeto agregado",
@@ -149,6 +149,58 @@ class Admin(commands.Cog): #Clase de cog para los comandos
 
                 embed = discord.Embed(title=f"Wisis borrados!",
                                     description=f"Se han borrado **{wisis}** a **{usuario.mention}**",
+                                    colour=discord.Colour.green())
+                await ctx.send(embed=embed)
+
+
+    @commands.hybrid_command(name="giveitem", description="Añade un item a un usuario")
+    @commands.cooldown(1, 10, commands.BucketType.member)
+    @commands.is_owner()
+    async def giveitem(self, ctx, usuario: discord.Member, objeto: str, cantidad: int):
+        async with asqlite.connect('wisis.db') as con:
+            async with con.cursor() as cur:
+                await cur.execute("SELECT objeto_id FROM objetos WHERE nombre = ?", (objeto,))
+                resultado = await cur.fetchone()
+                objeto_id = resultado[0]
+                if resultado == None:
+                    await ctx.send(f"No existe el objeto {objeto}")
+                    return
+
+                await cur.execute("SELECT usuario_id FROM inventario WHERE usuario_id = ? AND objeto_id = ?",(usuario.id, objeto_id))
+                resultado = await cur.fetchone()
+
+                if resultado == None:
+                    await cur.execute("INSERT INTO inventario (usuario_id, objeto_id, cantidad) VALUES (?, ?, ?)", (usuario.id, objeto_id, cantidad))
+
+                else:
+                    await cur.execute("UPDATE inventario SET cantidad = cantidad + ? WHERE usuario_id = ? AND objeto_id = ?", (cantidad, usuario.id, objeto_id))
+
+                embed = discord.Embed(title=f"Objeto añadido!",
+                                    description=f"Se han añadido el objeto**{objeto}** a **{usuario.mention}**",
+                                    colour=discord.Colour.green())
+                await ctx.send(embed=embed)
+
+
+    @commands.hybrid_command(name="removeitem", description="Remueve un objeto del inventario de alguien")
+    @commands.cooldown(1, 10, commands.BucketType.member)
+    @commands.is_owner()
+    async def removeitem(self, ctx, usuario: discord.Member, wisis: int):
+        async with asqlite.connect('wisis.db') as con:
+            async with con.cursor() as cur:
+                await cur.execute("SELECT objeto_id FROM objetos WHERE nombre = ?", (objeto,))
+                resultado = await cur.fetchone()
+                objeto_id = resultado[0]
+                if resultado == None:
+                    await ctx.send(f"No existe el objeto {objeto}")
+                    return
+
+                await cur.execute("SELECT usuario_id FROM inventario WHERE usuario_id = ? AND objeto_id = ?",(usuario.id, objeto_id))
+                resultado = await cur.fetchone()
+
+                await cur.execute("UPDATE inventario SET cantidad = cantidad - ? WHERE usuario_id = ? AND objeto_id = ?", (cantidad, usuario.id, objeto_id))
+
+                embed = discord.Embed(title=f"Objeto removido!",
+                                    description=f"Se han removido el objeto**{objeto}** a **{usuario.mention}**",
                                     colour=discord.Colour.green())
                 await ctx.send(embed=embed)
 
