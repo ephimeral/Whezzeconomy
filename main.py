@@ -234,4 +234,4 @@ async def clear_sistema_magia():
                     
 
 if __name__ == "__main__":
-    client.run("MTExNjUwODY3NTk3NzI1Mjk0NQ.GVoZp5.IrB5dK1hJMaM3NuwQXjIhyudgItprttYfHm4TM")
+    client.run(TOKEN)
