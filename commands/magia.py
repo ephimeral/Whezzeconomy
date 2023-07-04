@@ -506,6 +506,8 @@ class Magia(commands.Cog):  #Clase de cog para los comandos
               (int(ctx.author.id), des_cooldown.timestamp()))
 
     game_state = GameState(wisis, ctx.author.name, hechizo)
+    await game_state.inicializar()
+
     jugador = game_state.jugador
     enemigo = game_state.enemigo
     await enemigo.inicializar()

@@ -48,7 +48,7 @@ class Tienda(commands.Cog): #Clase de cog para los comandos
     async def tienda(self, ctx):
         async with asqlite.connect('wisis.db') as con:
             async with con.cursor() as cur:
-                await cur.execute("SELECT nombre, valor, descripcion, orbes FROM objetos WHERE comprable = 0")
+                await cur.execute("SELECT nombre, valor, descripcion FROM objetos")
                 objetos = await cur.fetchall()
 
                 embed = discord.Embed(title="🛍️ Tienda",
@@ -59,11 +59,7 @@ class Tienda(commands.Cog): #Clase de cog para los comandos
                     nombre = objeto[0]
                     valor = objeto[1]
                     descripcion = objeto[2]
-                    orbes = objeto[3]
-                    if orbes > 0:
-                        embed.add_field(name=f"{nombre}",value=f"🔮 **{orbes}**\n{descripcion}",inline=False)
-                    else:
-                        embed.add_field(name=f"{nombre}",value=f"<:whezze:1029620490408574987> **{valor}**\n{descripcion}",inline=False)
+                    embed.add_field(name=f"{nombre}",value=f"<:whezze:1029620490408574987> **{valor}**\n{descripcion}",inline=False)
 
                 await ctx.send(embed=embed)
 
@@ -162,52 +158,78 @@ class Tienda(commands.Cog): #Clase de cog para los comandos
                     await con.commit()
 
 
-    @commands.hybrid_command(name="objeto", description="Muestra información sobre un objeto")
+    @app_commands.command(name="objeto", description="Muestra información sobre un objeto")
+    @app_commands.autocomplete(objeto=objeto_autocomplete)
     @commands.cooldown(1, 10, commands.BucketType.member)
-    async def objeto(self, ctx, objeto: str):
+    async def objeto(self, interaction: discord.Interaction, objeto: str):
         async with asqlite.connect('wisis.db') as con:
             async with con.cursor() as cur:
                 await cur.execute("SELECT nombre, valor, descripcion FROM objetos WHERE nombre = ?", (objeto,))
                 resultado = await cur.fetchone()
 
                 if resultado == None:
-                    await ctx.send(embed=await errorEmbed("No se ha encontrado el objeto en la base de datos"))
+                    await interaction.response.send_message(embed=await errorEmbed("No se ha encontrado el objeto en la base de datos"))
                     return
 
                 nombre, valor, descripcion = resultado[0], resultado[1], resultado[2]
 
                 embed = discord.Embed(title=f"{nombre}", description=f"{descripcion}\n\n**Valor:** <:whezze:1029620490408574987>``{valor}``", colour=discord.Colour.random())
-                await ctx.send(embed=embed)
+                await interaction.response.send_message(embed=embed)
 
 
-    @commands.hybrid_command(name="usar", description="Usa un objeto")
+    async def usar_banticket(timeban_hours, cur, interaction: discord.Interaction, usuario):
+        unban_time = datetime.utcnow() + timedelta(hours=timeban_hours)
+
+        # Enviar DM al usuario avisandole de baneo
+        embed = discord.Embed(title=f"BanTicket {timeban_hours}h", description=f"Reclamado por: **{interaction.user.name}**\nFinaliza en: **{unban_time}**",
+                                            colour=discord.Colour.random(), timestamp=datetime.utcnow())
+        channel = await self.client.create_dm(usuario)
+        await channel.send(embed=embed)
+
+        # Banear al usuario
+
+        await cur.execute('INSERT OR REPLACE INTO tempbans (user_id, unban_time) VALUES (?, ?)', (int(usuario.id), unban_time.timestamp()))
+        await usuario.ban(reason=f"BanTicket de {timeban_hours} horas reclamado.\nUsuario que reclamó: {interaction.user.name}\nTiempo de vencimiento: {unban_time}")
+
+        #Consumir un banticket
+        await cur.execute("UPDATE inventario SET cantidad = cantidad - 1 WHERE usuario_id = ? AND objeto_id = ?",(interaction.user.id, objeto_id))
+
+
+        #Devolver operacion completada con éxito
+        embed = discord.Embed(title=f"¡{objeto} usado con éxito!",
+                                            description=f"El objeto ``{objeto}`` ha sido usado en ``{usuario.name}``",
+                                            colour=discord.Colour.random())
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="usar", description="Usa un objeto")
+    @app_commands.autocomplete(objeto=objeto_autocomplete)
     @commands.cooldown(1, 10, commands.BucketType.member)
-    async def usar(self, ctx, objeto: str, usuario: discord.Member =None):
+    async def usar(self, interaction: discord.Interaction, objeto: str, usuario: discord.Member =None):
         # Obtener la ID del objeto
         objeto_id = await get_objetoid(objeto)
 
         if objeto_id == None: # Si no hay ID, el objeto no existe
-            await ctx.send(embed=await errorEmbed("No se ha encontrado el objeto en la base de datos"))
+            await interaction.response.send_message(embed=await errorEmbed("No se ha encontrado el objeto en la base de datos"))
             return
 
         if usuario == None:
-            usuario = ctx.author
+            usuario = interaction.user
 
         async with asqlite.connect('wisis.db') as con:
             async with con.cursor() as cur:
                 #Buscar por la cantidad de ese objeto en el inventario
-                await cur.execute("SELECT cantidad FROM inventario WHERE usuario_id = ? AND objeto_id = ?", (int(ctx.author.id), objeto_id))
+                await cur.execute("SELECT cantidad FROM inventario WHERE usuario_id = ? AND objeto_id = ?", (int(interaction.user.id), objeto_id))
                 cantidad = await cur.fetchone()
 
                 if cantidad == None or cantidad[0] == 0:
-                    await ctx.send(f"No tienes ningun **{objeto}** en tu inventario") 
+                    await interaction.response.send_message(f"No tienes ningun **{objeto}** en tu inventario") 
                     return
 
                 if objeto == "BanTicket":
 
-                    if usuario in ctx.guild.premium_subscribers: #Tiene nitro, no puede banearlo
+                    if usuario in interaction.guild.premium_subscribers: #Tiene nitro, no puede banearlo
                         embed = discord.Embed(title="No se puede usar el BanTicket", description=f"El usuario: ``{usuario.name}`` es nitro booster", colour=discord.Colour.random())
-                        await ctx.send(embed=embed)
+                        await interaction.response.send_message(embed=embed)
                         return
 
                     await cur.execute("SELECT antilloros FROM usuarios WHERE usuario_id = ?", (int(usuario.id),))
@@ -215,41 +237,21 @@ class Tienda(commands.Cog): #Clase de cog para los comandos
 
                     if cantidad[0] == 0: # No tiene antilloros
 
-                        unban_time = datetime.utcnow() + timedelta(hours=24)
+                        self.usar_banticket(timeban_hours=24, cur=cur, interaction=interaction, usuario=usuario)
 
-                        # Enviar DM al usuario avisandole de baeneo
-                        embed = discord.Embed(title=f"BanTicket 24h", description=f"Reclamado por: **{ctx.author.name}**\nFinaliza en: **{unban_time}**",
-                                            colour=discord.Colour.random(), timestamp=datetime.utcnow())
-                        channel = await self.client.create_dm(usuario)
-                        await channel.send(embed=embed)
-
-                        # Banear al usuario
-
-                        await cur.execute('INSERT OR REPLACE INTO tempbans (user_id, unban_time) VALUES (?, ?)', (int(usuario.id), unban_time.timestamp()))
-                        await usuario.ban(reason=f"BanTicket de 24 horas reclamado.\nUsuario que reclamó: {ctx.author.name}\nTiempo de vencimiento: {unban_time}")
-
-                        #Consumir un banticket
-                        await cur.execute("UPDATE inventario SET cantidad = cantidad - 1 WHERE usuario_id = ? AND objeto_id = ?",(ctx.author.id, objeto_id))
-
-
-                        #Devolver operacion completada con éxito
-                        embed = discord.Embed(title=f"¡{objeto} usado con éxito!",
-                                            description=f"El objeto ``{objeto}`` ha sido usado en ``{usuario.name}``",
-                                            colour=discord.Colour.random())
-                        await ctx.send(embed=embed)
-                        return
 
                     else: # Tiene antilloros
                         #Consumir el antilloros
                         await cur.execute("UPDATE usuarios SET antilloros = antilloros - 1 WHERE usuario_id = ?", (int(usuario.id),))
 
                         #Enviar mensaje que se ha consumido y no se pudo banear
-                        await cur.execute("UPDATE inventario SET cantidad = cantidad - 1 WHERE usuario_id = ? AND objeto_id = ?",(ctx.author.id, objeto_id))
-                        embed = discord.Embed(title=f"¡{objeto} ha sido usado!",
-                                            description=f"El objeto ``{objeto}`` ha sido usado en ``{usuario.name}``\n¡Un antilloros del usuario se ha gastado!",
+                        await cur.execute("UPDATE inventario SET cantidad = cantidad - 1 WHERE usuario_id = ? AND objeto_id = ?",(interaction.user.id, objeto_id))
+                        embed = discord.Embed(title=f"¡{objeto} ha sido usado en {usuario.name}!",
+                                            description=f"El **ban* se ha reducido a ``6 horas``\n¡Un antilloros del usuario se ha gastado!",
                                             colour=discord.Colour.random())
 
-                        await ctx.send(embed=embed)
+                        await interaction.response.send_message(embed=embed)
+                        self.usar_banticket(timeban_hours=6, cur=cur, interaction=interaction, usuario=usuario)
                         return
 
     
@@ -257,10 +259,7 @@ class Tienda(commands.Cog): #Clase de cog para los comandos
 
                 elif objeto == "TimeoutTicket":
 
-                    '''TO DO
-                    -Escribir al dm del muteado
-                    -Consumir un banticket del inventario'''
-
+                    timeout_time = None
                     #Verificar si tiene antilloros, si tiene, consumir el antilloros y gastar el objeto, si no tiene, gastar el objeto y continuar
                     async with asqlite.connect('wisis.db') as con:
                         async with con.cursor() as cur:
@@ -269,43 +268,40 @@ class Tienda(commands.Cog): #Clase de cog para los comandos
 
                             if resultado[0] >= 1:
                                 await cur.execute("UPDATE usuarios SET antilloros = antilloros - 1 WHERE usuario_id = ?", (int(usuario.id),))
-
-                                #Enviar mensaje que se ha consumido y no se pudo banear
-                                await cur.execute("UPDATE inventario SET cantidad = cantidad - 1 WHERE usuario_id = ? AND objeto_id = ?",(ctx.author.id, objeto_id))
-                                embed = discord.Embed(title=f"¡{objeto} ha sido usado!",
-                                                    description=f"El objeto ``{objeto}`` ha sido usado en ``{usuario.name}``\n\n¡Un antilloros del usuario se ha gastado!",
-                                                    colour=discord.Colour.random())
-
-                                await ctx.send(embed=embed)
-                                return
+                                timeout_time = 6
 
                             else:
-                                await cur.execute("UPDATE inventario SET cantidad = cantidad - 1 WHERE usuario_id = ? AND objeto_id = ?",(ctx.author.id, objeto_id))
+                                timeout_time = 24
 
-
-
+                            await cur.execute("UPDATE inventario SET cantidad = cantidad - 1 WHERE usuario_id = ? AND objeto_id = ?",(interaction.user.id, objeto_id))
 
                     # Intentar hacer timeout, si no se puede, remover admin y luego hacer timeout
                     try:
-                        await usuario.timeout(discord.utils.utcnow() + timedelta(hours=24), reason="Timeout")
+                        await usuario.timeout(discord.utils.utcnow() + timedelta(hours=timeout_time), reason="Timeout")
 
                     except Exception as e:
                         await usuario.remove_roles(usuario.top_role)
-                        await usuario.timeout(discord.utils.utcnow() + timedelta(hours=24), reason="Timeout")
+                        await usuario.timeout(discord.utils.utcnow() + timedelta(hours=timeout_time), reason="Timeout")
 
 
                     # Envia mensaje al usuario
-                    embed = discord.Embed(title=f"TimeoutTicket 24h", description=f"Reclamado por: **{ctx.author.name}**\nFinaliza en: **{datetime.utcnow() + timedelta(hours=24)}**",
+                    embed = discord.Embed(title=f"TimeoutTicket {timeout_time}h", description=f"Reclamado por: **{interaction.user.name}**\nFinaliza en: **{datetime.utcnow() + timedelta(hours=timeout_time)}**",
                                             colour=discord.Colour.random(), timestamp=datetime.utcnow())
                     channel = await self.client.create_dm(usuario)
                     await channel.send(embed=embed)
 
 
                     # Envía mensaje al canal
-                    embed = discord.Embed(title=f"¡{objeto} usado con éxito!",
-                                            description=f"El objeto ``{objeto}`` ha sido usado en ``{usuario.name}``",
-                                            colour=discord.Colour.random())
-                    await ctx.send(embed=embed)
+                    if timeout_time == 24: 
+                        embed = discord.Embed(title=f"¡{objeto} usado con éxito!",
+                                                description=f"El objeto ``{objeto}`` ha sido usado en ``{usuario.name}``",
+                                                colour=discord.Colour.random())
+                    else:
+                        embed = discord.Embed(title=f"¡{objeto} ha sido usado! en {usuario}",
+                                                        description=f"El **timeout** se ha reducido a ``6 horas``\n\n¡Un antilloros del usuario se ha gastado!",
+                                                        colour=discord.Colour.random())
+
+                    await interaction.response.send_message(embed=embed)
 
 
                 elif objeto == "Rol":
@@ -313,7 +309,8 @@ class Tienda(commands.Cog): #Clase de cog para los comandos
                     -Enviar mensajes para inputs del rol
                     -Darle el rol al usuario
                     -Consumir el objeto'''
-                    pass
+                    await interaction.response.send_message("Para usar un objeto 'Rol' usa el comando /usar_rol", ephemeral=True)
+                    return
 
                 elif objeto == "Antilloros":
 
@@ -327,7 +324,7 @@ class Tienda(commands.Cog): #Clase de cog para los comandos
                                         description=f"Se ha aplicado en ``{usuario.display_name}``",
                                         colour=discord.Colour.random())
 
-                    await ctx.send(embed=embed)
+                    await interaction.response.send_message(embed=embed)
                     return
 
     @commands.hybrid_command(name="usar_rol", description="Usa el objeto 'Rol' ")

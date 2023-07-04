@@ -26,14 +26,14 @@ class Admin(commands.Cog): #Clase de cog para los comandos
     @commands.hybrid_command(name="additem", description="Añade un objeto")
     @commands.cooldown(1, 10, commands.BucketType.member)
     @commands.is_owner()
-    async def additem(self, ctx, nombre: str, valor: int, descripcion: str, comprable: int):
+    async def additem(self, ctx, nombre: str, valor: int, descripcion: str):
         async with asqlite.connect('wisis.db') as con:
             async with con.cursor() as cur:
                 await cur.execute("SELECT COUNT(*) FROM objetos WHERE nombre = ?", (nombre,))
                 result = await cur.fetchone()
 
                 if result[0] == 0:
-                    await cur.execute("INSERT INTO objetos (nombre, valor, descripcion, comprable) VALUES (?, ?, ?, ?)", (nombre, valor, descripcion, comprable))
+                    await cur.execute("INSERT INTO objetos (nombre, valor, descripcion) VALUES (?, ?, ?)", (nombre, valor, descripcion))
                     await con.commit()
 
                     embed = discord.Embed(title="Objeto agregado",

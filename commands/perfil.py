@@ -14,13 +14,13 @@ async def seleccionar_rango(wisis_totales):
 	elif wisis_totales >= 100 and wisis_totales < 500:
 		return "Comediante de calle"
 
-	elif wisis_totales >= 500 and wisis_totales < 2000:
+	elif wisis_totales >= 500 and wisis_totales < 1000:
 		return "Comediante Stand-Up"
 
-	elif wisis_totales >= 2000 and wisis_totales < 5000:
+	elif wisis_totales >= 1000 and wisis_totales < 2000:
 		return "Payaso"
 
-	elif wisis_totales >= 5000:
+	elif wisis_totales >= 2000:
 		return "Dueño del circo"
 
 
@@ -38,15 +38,13 @@ class Perfil(commands.Cog): #Clase de cog para los comandos
 		    	if usuario == None:
 		    		usuario = ctx.author
 
-		    	await cur.execute("SELECT wisis, wisis_totales, orbes, hechizo_activo FROM usuarios WHERE usuario_id = ?", (int(usuario.id),))
+		    	await cur.execute("SELECT wisis, wisis_totales FROM usuarios WHERE usuario_id = ?", (int(usuario.id),))
 		    	whezzes = await cur.fetchone()
 		    	embed = discord.Embed(title=f"{usuario.display_name} Whezzes",
 			    					colour=discord.Colour.dark_gold())
 		    	embed.add_field(name=f"<:whezze:1029620490408574987>", value=f"{whezzes[0]}")
 
 		    	embed.add_field(name="\n<:whezze:1029620490408574987> **TOTALES**", value=f"{whezzes[1]}")
-		    	embed.add_field(name="\n🔮", value=f"{whezzes[2]}")
-		    	embed.add_field(name="\nHechizo", value=f"``{whezzes[3]}``")
 		    	embed.add_field(name="``Rango:``", value=f"**{await seleccionar_rango(whezzes[1])}**", inline=False)
 
 

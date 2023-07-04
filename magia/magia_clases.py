@@ -8,11 +8,12 @@ class GameState:
 
   def __init__(self, wisis, nombre, hechizo):
     self.jugador = Jugador(wisis, nombre, self, hechizo)
-    self.enemigo = Enemigo(wisis, self)
+    self.fabrica = FabricaEnemigos(wisis, self)
+    self.enemigo = None
     self.turno = 0
     self.decision_jugador = None
     self.decision_enemigo = None
-    self.map_cooldown = self.enemigo.map_cooldown
+    self.map_cooldown = None
     self.cooldown_hechizo = {}
     self.wealth_diccionario = {}
     self.touch_diccionario = {}
@@ -22,8 +23,26 @@ class GameState:
     self.parry_cooldown = {}
     self.battle_logs = "╭── ⋅ ⋅ ── ✩**ACCIONES**✩ ── ⋅ ⋅ ──╮ \n\n"
 
+  async def inicializar(self):
+    self.enemigo = await self.fabrica.crearRandomMago()
+    self.map_cooldown = await self.map_cooldown_func(self.enemigo.magia)
+
   async def sumar_turno(self):
     self.turno += 1
+
+  async def map_cooldown_func(self, magia):
+
+    dict_cooldown = {
+      self.stellar_drip: 3,
+      self.wealth_wraith: 4,
+      self.gucci_invoker: 3,
+      self.touch_of_gangsta: 4,
+      self.keez_deez_nuts: 4,
+      self.holy_sheesh: 3,
+      self.thug_freeze: 4
+    }
+
+    return dict_cooldown[magia]
 
   async def wealth_timer(self):
     wealth_copy = self.wealth_diccionario.copy()
@@ -121,18 +140,14 @@ class GameState:
         if af_vida_enemiga <= 0:
           af_vida_enemiga = 0
 
-        self.cooldown_hechizo[
-          jugador] = self.turno + await self.enemigo.map_cooldown(jugador.magia
-                                                                  )
+        self.cooldown_hechizo[jugador] = self.turno + await self.map_cooldown_func(jugador.magia)
 
       elif jugador.magia in [self.keez_deez_nuts]:
 
         bef_vida_jugador = round(self.jugador.hp)
 
         curacion = round(await jugador.magia(jugador, enemigo))
-        self.cooldown_hechizo[
-          jugador] = self.turno + await self.enemigo.map_cooldown(jugador.magia
-                                                                  )
+        self.cooldown_hechizo[jugador] = self.turno + await self.map_cooldown_func(jugador.magia)
         af_vida_jugador = round(jugador.hp)
 
         self.battle_logs += f"¡✨ ``{await nombre_magia(jugador.magia)}`` ha recuperado ``{curacion}`` de vida!\n❤️``{bef_vida_jugador}`` -> ❤️ ``{af_vida_jugador}``\n\n"
@@ -188,7 +203,7 @@ class GameState:
           af_vida_jugador = 0
 
         self.cooldown_hechizo[
-          enemigo] = self.turno + await self.enemigo.map_cooldown(enemigo.magia
+          enemigo] = self.turno + await self.map_cooldown_func(enemigo.magia
                                                                   )
 
       elif enemigo.magia in [self.keez_deez_nuts]:
@@ -197,7 +212,7 @@ class GameState:
 
         curacion = round(await enemigo.magia(enemigo, jugador))
         self.cooldown_hechizo[
-          enemigo] = self.turno + await self.enemigo.map_cooldown(enemigo.magia
+          enemigo] = self.turno + await self.map_cooldown_func(enemigo.magia
                                                                   )
 
         af_vida_enemiga = round(self.enemigo.hp)
@@ -343,219 +358,200 @@ class GameState:
     return None
 
 
-class Enemigo:
+
+
+class FabricaEnemigos:
 
   def __init__(self, wisis, game_state):
     self.wisis = wisis
-    self.name = None
-    self.daño = None
-    self.hp = None
-    self.hp_total = None
-    self.imagen = None
-    self.magia = None
+    self.game_state = game_state
+
+  async def crearBlueMage(self):
+    enemigo = Enemigo(name="Blue Mage",
+                      daño=self.wisis * 0.13,
+                      hp=self.wisis * 1.75,
+                      hp_total=self.wisis * 1.75,
+                      objeto="Zapatos Drip",
+                      lostQuote="I... don't had... enough drip...",
+                      winQuote="Your jordans are fake",
+                      quotes=[
+                            "Liches be actin' so tough, till you use holy magic",
+                            "Die already, thou are losing precious magic time",
+                            "Thou should cast a rope around your neck, NOW!"
+                              ],
+                      imagen="https://cdn.discordapp.com/attachments/1029620174015434772/1116476419598450848/background-remove.png",
+                      magia=self.game_state.stellar_drip,
+                      colour=discord.Colour.blue(),
+                      game_state=self.game_state,
+                      )
+    await enemigo.inicializar()
+    return enemigo
+
+  async def crearGreenWizard(self):
+    enemigo = Enemigo(name="Green Wizard",
+                      daño=self.wisis * 0.17,
+                      hp=self.wisis * 1.6,
+                      hp_total=self.wisis * 1.6,
+                      objeto="Luna Oscura",
+                      lostQuote="Thou defeat me... This shalt be destiny",
+                      winQuote="This rape was sponsored by the shadow government",
+                      quotes=[
+                          "Thou look like a virgin, i'll cast some bitches for thou",
+                          "Look at those shiny jewelry, they bright more than your future",
+                          "Shadow voices are whispering something..."
+                            ],
+                      imagen="https://cdn.discordapp.com/attachments/1029620174015434772/1116476666055753738/background-remove.png",
+                      magia=self.game_state.wealth_wraith,
+                      colour=discord.Colour.dark_green(),
+                      game_state=self.game_state,
+                      )
+    await enemigo.inicializar()
+    return enemigo
+
+  async def crearRedFlame(self):
+    enemigo = Enemigo(name="Red Flame",
+                      daño=self.wisis * 0.32,
+                      hp=self.wisis * 1.3,
+                      hp_total=self.wisis * 1.3,
+                      objeto="Anillo de Ruby",
+                      lostQuote="I guess... This is the end...",
+                      winQuote="Hueleme el dedo",
+                      quotes=[
+                            "Little nooby wizard doesn't know he is already lost",
+                            "I wish i had some draconian zaza...",
+                            "I can smell your fear, thou are worthless"
+                            ],
+                      imagen="https://cdn.discordapp.com/attachments/1029613068788957206/1116523129209102387/imagen.png",
+                      magia=self.game_state.touch_of_gangsta,
+                      colour=discord.Colour.brand_red(),
+                      game_state=self.game_state,
+                      )
+    await enemigo.inicializar()
+    return enemigo
+
+  async def crearMagusOrange(self):
+    enemigo = Enemigo(name="Magus Orange",
+                      daño=self.wisis * 0.28,
+                      hp=self.wisis * 1.5,
+                      hp_total=self.wisis * 1.5,
+                      objeto="Collar de la muerte",
+                      lostQuote="I'll be tellin' da shadow government your achievements",
+                      winQuote="Easy as fuck, come back when you can stand those spells",
+                      quotes=[
+                            "Don't waste my precious time with those nooby spells",
+                            "What about casting some hoes", "Your momma goes harder than this"
+                            ],
+                      imagen="https://cdn.discordapp.com/attachments/1029613068788957206/1116125599497453629/20230607_034151.jpg",
+                      magia=self.game_state.keez_deez_nuts,
+                      colour=discord.Colour.orange(),
+                      game_state=self.game_state,
+                      )
+    await enemigo.inicializar()
+    return enemigo
+
+  async def crearYellowSorcerer(self):
+    enemigo = Enemigo(name="Yellow Sorcerer",
+                      daño=self.wisis * 0.24,
+                      hp=self.wisis * 1.5,
+                      hp_total=self.wisis * 1.5,
+                      objeto="Sphaera Ocularis",
+                      lostQuote="It is what it is",
+                      winQuote="My gay detector it's beeping",
+                      quotes=[
+                            "My magic ball already saw your power, this fight will be effortless",
+                            "Apoco si muy verga", "Why are thou hurting yourself haha"
+                            ],
+                      imagen="https://cdn.discordapp.com/attachments/1029613068788957206/1116522060349444146/20230607_0342533.png",
+                      magia=self.game_state.keez_deez_nuts,
+                      colour=discord.Colour.gold(),
+                      game_state=self.game_state,
+                      )
+    await enemigo.inicializar()
+    return enemigo
+
+  async def crearPurpleShadow(self):
+    enemigo = Enemigo(name="Purple Shadow",
+                      daño=self.wisis * 0.30,
+                      hp=self.wisis * 1.4,
+                      hp_total=self.wisis * 1.4,
+                      objeto="Joyería Mágica",
+                      lostQuote="You just had lucky",
+                      winQuote="Don't worry, thou can try again, i enjoy beating your ass'",
+                      quotes=[
+                            "Let's finish this quickly, i have to bang some witches",
+                            "Thou shalt summon the spirit lub, cuz this will hurt",
+                            "Your soul will be mine, in this orb is where thou will live forever"
+                          ],
+                      imagen="https://cdn.discordapp.com/attachments/1029620174015434772/1116477569961832508/background-remove.png",
+                      magia=self.game_state.thug_freeze,
+                      colour=discord.Colour.dark_purple(),
+                      game_state=self.game_state,
+                      )
+    await enemigo.inicializar()
+    return enemigo
+
+  async def crearPinkShot(self):
+    enemigo = Enemigo(name="Pink Shot",
+                      daño= self.wisis * 0.35,
+                      hp=self.wisis * 1.25,
+                      hp_total=self.wisis * 1.25,
+                      objeto="Chumbo",
+                      lostQuote="My bullets wasn't good enough? Next time i'll shoot you with some nasty spells",
+                      winQuote="One shot, one kill",
+                      quotes=[
+                            "Prepare to die",
+                            "I didn't believe in magic till i see your momma affording three niggas at the same time",
+                            "I trust nothing but the strength of my spells and the edge of my gun"
+                              ],
+                      imagen="https://cdn.discordapp.com/attachments/1029620174015434772/1116478265033498694/background-remove.png",
+                      magia=self.game_state.holy_sheesh,
+                      colour=discord.Colour.fuchsia(),
+                      game_state=self.game_state,
+                      )
+    await enemigo.inicializar()
+    return enemigo
+
+  async def crearRandomMago(self):
+
+    magos_builder = [self.crearBlueMage, self.crearGreenWizard, self.crearRedFlame, self.crearMagusOrange, self.crearYellowSorcerer, self.crearPurpleShadow, self.crearPinkShot]
+
+    builder = random.choices(magos_builder)[0]
+    enemigo = await builder()
+    return enemigo
+
+
+class Enemigo:
+
+  def __init__(self, name, daño, hp, hp_total, objeto, lostQuote, winQuote, quotes, imagen, magia, colour, game_state):
+    self.name = name
+    self.daño = daño
+    self.hp = hp
+    self.hp_total = hp_total
+    self.imagen = imagen
+    self.magia = magia
+    self.colour = colour
+    self.objeto = objeto
+    self.winQuote = winQuote
+    self.lostQuote = lostQuote
+    self.quotes = quotes
+    self.game_state = game_state
+    self.decidir = None
+
+    # Atributos booleanos
     self.isDefendido = False
     self.isFreeze = False
     self.isStun = False
-    self.colour = None
     self.isReflecting = False
     self.Acertar = False
     self.isDamageBuff = False
     self.isParry = False
     self.isNegating = False
-    self.objeto = None
-    self.winQuote = None
     self.isReducingDamage = False
-    self.lostQuote = None
-    self.name_mago = None
-    self.quotes = None
-    self.decidir = None
-    self.game_state = game_state
 
   async def inicializar(self):
-    self.name = await self.random_mago(self.wisis)
-    self.daño = self.wisis * await self.mago_daño(self.name)
-    self.hp = self.wisis * await self.mago_vida(self.name)
-    self.objeto = await self.definir_objeto(self.name)
-    self.hp_total = self.wisis * await self.mago_vida(self.name)
-    self.lostQuote = await self.lost_quote(self.name)
-    self.winQuote = await self.win_quote(self.name)
-    self.quotes = await self.quotes_func(self.name)
     self.decidir = await self.set_decision(self.name)
-    self.imagen = await self.imagen_mago(self.name)
-    self.magia = await self.mago_poder(self.name)
-    self.colour = await self.color_mago(self.name)
 
   """ FUNCIONES DE CONSTRUCCIÓN"""
-
-  async def lost_quote(self, name):
-    diccionario_lostquote = {
-      "Blue Mage":
-      "I... don't had... enough drip...",
-      "Green Wizard":
-      "Thou defeat me... This shalt be destiny",
-      "Yellow Sorcerer":
-      "It is what it is",
-      "Magus Orange":
-      "I'll be tellin' da shadow government your achievements",
-      "Purple Shadow":
-      "Your momma is fat",
-      "Red Flame":
-      "I guess... This is the end...",
-      "Pink Shot":
-      "My bullets wasn't good enough? Next time i'll shoot you with some nasty spells"
-    }
-
-    return diccionario_lostquote[name]
-
-  async def win_quote(self, name):
-    diccionario_winquote = {
-      "Blue Mage": "Do thou like those nasty moves",
-      "Green Wizard": "This rape was sponsored by the shadow government",
-      "Yellow Sorcerer": "My gay detector it's beeping",
-      "Magus Orange":
-      "Easy as fuck, come back when you can stand those spells",
-      "Purple Shadow":
-      "Don't worry, thou can try again, i enjoy beating your ass'",
-      "Red Flame": "Hueleme el dedo",
-      "Pink Shot": "One shot, one kill"
-    }
-
-    return diccionario_winquote[name]
-
-  async def quotes_func(self, name):
-    diccionario_quotes = {
-      "Blue Mage": [
-        "Liches be actin' so tough, till you use holy magic",
-        "Die already, thou are losing precious magic time",
-        "Thou should cast a rope around your neck, NOW!"
-      ],
-      "Green Wizard": [
-        "Thou look like a virgin, i'll cast some bitches for thou",
-        "Look at those shiny jewelry, they bright more than your future",
-        "Shadow voices are whispering something..."
-      ],
-      "Yellow Sorcerer": [
-        "My magic ball already saw your power, this fight will be effortless",
-        "Apoco si muy verga", "Why are thou hurting yourself haha"
-      ],
-      "Magus Orange": [
-        "Don't waste my precious time with those nooby spells",
-        "What about casting some hoes", "Your momma goes harder than this"
-      ],
-      "Purple Shadow": [
-        "Let's finish this quickly, i have to bang some witches",
-        "Thou shalt summon the spirit lub, cuz this will hurt",
-        "Look at this orb, this is where your soul will live forever"
-      ],
-      "Red Flame": [
-        "Little nooby wizard doesn't know he is already lost",
-        "I wish i had some draconian zaza...",
-        "I can smell your fear, thou are worthless"
-      ],
-      "Pink Shot": [
-        "Prepare to die",
-        "I didn't believe in magic till i see your momma affording three niggas at the same time",
-        "I trust nothing but the strength of my spells and the edge of my gun"
-      ]
-    }
-
-    return diccionario_quotes[name]
-
-  async def randomquote(self):
-    return self.quotes[random.randint(0, 2)]
-
-  async def random_mago(self, wisis):
-    magos = [
-      "Blue Mage", "Green Wizard", "Yellow Sorcerer", "Magus Orange",
-      "Purple Shadow", "Red Flame", "Pink Shot"
-    ]
-    probabilidades = [0.5, 0.4, 0.4, 0.3, 0.3, 0.2, 0.2]
-    return random.choices(magos, weights=probabilidades)[0]
-
-  async def color_mago(self, name):
-
-    diccionario_color = {
-      "Blue Mage": discord.Colour.blue(),
-      "Green Wizard": discord.Colour.dark_green(),
-      "Yellow Sorcerer": discord.Colour.gold(),
-      "Magus Orange": discord.Colour.orange(),
-      "Purple Shadow": discord.Colour.dark_purple(),
-      "Red Flame": discord.Colour.brand_red(),
-      "Pink Shot": discord.Colour.fuchsia()
-    }
-    return diccionario_color[name]
-
-  async def mago_daño(self, name):
-    diccionario_daño = {
-      "Blue Mage": 0.13,
-      "Green Wizard": 0.17,
-      "Yellow Sorcerer": 0.24,
-      "Magus Orange": 0.28,
-      "Purple Shadow": 0.30,
-      "Red Flame": 0.32,
-      "Pink Shot": 0.35
-    }
-    return diccionario_daño[name]
-
-  async def definir_objeto(self, name):
-
-    diccionario_objeto = {
-      "Blue Mage": "Zapatos Drip",
-      "Green Wizard": "Luna Oscura",
-      "Yellow Sorcerer": "Sphaera Ocularis",
-      "Magus Orange": "Collar de la Muerte",
-      "Purple Shadow": "Joyería Mágica",
-      "Red Flame": "Anillo de Ruby",
-      "Pink Shot": "Chumbo"
-    }
-
-    return diccionario_objeto[name]
-
-  async def mago_vida(self, name):
-    diccionario_vida = {
-      "Blue Mage": 1.75,
-      "Green Wizard": 1.6,
-      "Yellow Sorcerer": 1.5,
-      "Magus Orange": 1.5,
-      "Purple Shadow": 1.4,
-      "Red Flame": 1.3,
-      "Pink Shot": 1.25
-    }
-    return diccionario_vida[name]
-
-  async def imagen_mago(self, name):
-    diccionario_imagen = {
-      "Blue Mage":
-      "https://cdn.discordapp.com/attachments/1029620174015434772/1116476419598450848/background-remove.png",
-      "Green Wizard":
-      "https://cdn.discordapp.com/attachments/1029620174015434772/1116476666055753738/background-remove.png",
-      "Yellow Sorcerer":
-      "https://cdn.discordapp.com/attachments/1029613068788957206/1116522060349444146/20230607_0342533.png",
-      "Magus Orange":
-      "https://cdn.discordapp.com/attachments/1029613068788957206/1116125599497453629/20230607_034151.jpg",
-      "Purple Shadow":
-      "https://cdn.discordapp.com/attachments/1029620174015434772/1116477569961832508/background-remove.png",
-      "Red Flame":
-      "https://cdn.discordapp.com/attachments/1029613068788957206/1116523129209102387/imagen.png",
-      "Pink Shot":
-      "https://cdn.discordapp.com/attachments/1029620174015434772/1116478265033498694/background-remove.png"
-    }
-    return diccionario_imagen[name]
-
-  async def mago_poder(self, name):
-
-    m = self.game_state
-    diccionario_vida = {
-      "Blue Mage": m.stellar_drip,
-      "Green Wizard": m.wealth_wraith,
-      "Yellow Sorcerer": m.gucci_invoker,
-      "Magus Orange": m.keez_deez_nuts,
-      "Purple Shadow": m.thug_freeze,
-      "Red Flame": m.touch_of_gangsta,
-      "Pink Shot": m.holy_sheesh
-    }
-    return diccionario_vida[name]
-
   async def set_decision(self, name):
 
     diccionario_decisiones = {
@@ -571,23 +567,10 @@ class Enemigo:
     decidir = diccionario_decisiones[self.name]
     return decidir
 
+  async def randomquote(self):
+    return random.choices(self.quotes)[0]
+
   """ FUNCIONES DE FLUJO """
-
-  async def map_cooldown(self, magia):
-
-    m = self.game_state
-
-    dict_cooldown = {
-      m.stellar_drip: 3,
-      m.wealth_wraith: 4,
-      m.gucci_invoker: 3,
-      m.touch_of_gangsta: 4,
-      m.keez_deez_nuts: 4,
-      m.holy_sheesh: 3,
-      m.thug_freeze: 4
-    }
-
-    return dict_cooldown[magia]
 
   async def recibir_daño(self, daño):
 
@@ -664,8 +647,7 @@ class Enemigo:
 
       acertar = await self.magia(m.enemigo, m.jugador)
 
-      m.cooldown_hechizo[m.enemigo] = m.turno + await self.map_cooldown(
-        self.magia)
+      m.cooldown_hechizo[m.enemigo] = m.turno + await m.map_cooldown_func(self.magia)
       if acertar:
         self.Acertar = True
 
@@ -754,7 +736,7 @@ class Enemigo:
 
       acertar = await self.magia(m.enemigo, m.jugador)
 
-      m.cooldown_hechizo[m.enemigo] = m.turno + await self.map_cooldown(
+      m.cooldown_hechizo[m.enemigo] = m.turno + await m.map_cooldown_func(
         self.magia)
       if acertar:
         self.Acertar = True
@@ -801,7 +783,7 @@ class Enemigo:
 
       acertar = await self.magia(gs.enemigo, gs.jugador)
 
-      gs.cooldown_hechizo[self] = gs.turno + await self.map_cooldown(self.magia
+      gs.cooldown_hechizo[self] = gs.turno + await gs.map_cooldown_func(self.magia
                                                                      )
       if acertar:
         self.Acertar = True
@@ -854,7 +836,7 @@ class Enemigo:
 
       acertar = await self.magia(gs.enemigo, gs.jugador)
 
-      gs.cooldown_hechizo[self] = gs.turno + await self.map_cooldown(self.magia
+      gs.cooldown_hechizo[self] = gs.turno + await gs.map_cooldown_func(self.magia
                                                                      )
       if acertar:
         self.Acertar = True
@@ -936,7 +918,7 @@ class Enemigo:
 
       acertar = await self.magia(gs.enemigo, gs.jugador)
 
-      gs.cooldown_hechizo[self] = gs.turno + await self.map_cooldown(self.magia
+      gs.cooldown_hechizo[self] = gs.turno + await gs.map_cooldown_func(self.magia
                                                                      )
       if acertar:
         self.Acertar = True
@@ -984,7 +966,7 @@ class Jugador:
 
       m.cooldown_hechizo[
         m.
-        jugador] = self.game_state.turno + await self.game_state.map_cooldown(
+        jugador] = self.game_state.turno + await self.game_state.map_cooldown_func(
           self.magia)
       if acertar:
         self.Acertar = True

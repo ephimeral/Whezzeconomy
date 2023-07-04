@@ -17,8 +17,7 @@ class MyBot(commands.Bot):
             await client.load_extension(extension)
         check_tempbans.start()
         clear_sistema.start()
-        clear_sistema_magia.start()
-
+        
     async def on_ready(self):
         print(f"Logging in as: {self.user}")
 
@@ -82,10 +81,10 @@ async def unload(ctx, extension : str):
 @commands.is_owner()
 async def actualizacion(ctx):
 
-    embed = discord.Embed(title="WHEZZECONOMY 3.1",
-                        description="➠ Autocompletado al comprar con ``/`` para los disléxicos del server\n\n➠Varios bugs corregidos\n\n➠Evento limitado **SHADOW WIZARD MONEY GANG**, gana objetos derrotando magos,\n``/tutorial`` para empezar",
+    embed = discord.Embed(title="WHEZZECONOMY 3.22",
+                        description="➠ Autocompletado en los comandos ``comprar, objeto, usar`` con ``/`` para los disléxicos del server\n\n➠Antilloros **NERFEADO**\n~~Protege contra un Ticket~~ -> `Reduce el tiempo del ticket a un 25%`\n\n➠ Reducido los wisis necesarios para los rangos 'Payaso' y 'Dueño del circo'\n~~2000~~ -> `1000`\n~~5000~~ -> `2000`",
                         colour=discord.Colour.dark_purple())
-    embed.set_image(url="https://img.ifunny.co/images/f5a7297a57a663074da4b5c09561eec1265724ad0669bbc9a4d2b42454c0113b_1.jpg")
+    embed.set_image(url="https://cdn.discordapp.com/attachments/1029613068788957206/1096983482657411163/SPOILER_916f7624e2135a93176ecb478ef873ec.png")
     await ctx.send(embed=embed)
 
 
@@ -212,20 +211,6 @@ async def clear_sistema():
         async with con.cursor() as cur:
             await cur.execute("DELETE FROM sistemawis")
 
-@tasks.loop(seconds=20)
-async def clear_sistema_magia():
-    async with asqlite.connect('wisis.db') as con:
-        async with con.cursor() as cur:
-
-            current_time = datetime.utcnow().timestamp()
-            await cur.execute('SELECT user_id FROM sistema_magia WHERE des_cooldown <= ?', (current_time,))
-            expired_cool = await cur.fetchall()
-            if len(expired_cool) == 0:
-                return
-
-            for cool in expired_cool:
-                await cur.execute('DELETE FROM sistema_magia WHERE des_cooldown <= ?', (current_time,))
-
 
 
 
@@ -234,4 +219,4 @@ async def clear_sistema_magia():
                     
 
 if __name__ == "__main__":
-    client.run(TOKEN)
+    client.run("MTExNjUwODY3NTk3NzI1Mjk0NQ.GDKA9m.I3DKMJxYBabCLgwHex5nJWwU65ccwCCY5WTTdo")
