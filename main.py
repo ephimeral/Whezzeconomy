@@ -219,4 +219,4 @@ async def clear_sistema():
                     
 
 if __name__ == "__main__":
-    client.run("MTExNjUwODY3NTk3NzI1Mjk0NQ.GDKA9m.I3DKMJxYBabCLgwHex5nJWwU65ccwCCY5WTTdo")
+    client.run(TOKEN)
